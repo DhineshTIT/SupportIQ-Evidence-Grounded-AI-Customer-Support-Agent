@@ -1,0 +1,2 @@
+# SupportIQ-Evidence-Grounded-AI-Customer-Support-Agent
+SupportIQ — Evidence-Grounded AI Customer Support Agent is an intelligent customer-support system designed to automate routine support interactions while maintaining accuracy, transparency, and safe human escalation. The project uses customer-support conversations from Twitter to understand how a selected brand historically handled customer issues 
