@@ -1,2 +1,142 @@
-# SupportIQ-Evidence-Grounded-AI-Customer-Support-Agent
-SupportIQ — Evidence-Grounded AI Customer Support Agent is an intelligent customer-support system designed to automate routine support interactions while maintaining accuracy, transparency, and safe human escalation. The project uses customer-support conversations from Twitter to understand how a selected brand historically handled customer issues 
+# SupportIQ — Hiver SDE Intern Take-Home
+
+An evidence-grounded customer-support agent built around the **Customer Support on Twitter** dataset. The pipeline supports intent classification, historical-resolution retrieval, reply drafting, and human escalation with reasons.
+
+> **Important:** This repository intentionally does **not** fabricate benchmark results or hand labels. You must provide the Kaggle dataset and create the required 150–250-example golden set yourself. The scripts generate all reported metrics from those inputs.
+
+## Assignment mapping
+
+| Hiver requirement | Implementation |
+|---|---|
+| Small intent set | `app/intents.py` + optional discovered labels in `data/golden/golden.csv` |
+| Historical grounding | TF-IDF retrieval over prior customer→brand resolution pairs |
+| Auto vs human | `app/escalation.py` using intent confidence, retrieval similarity and risk triggers |
+| 150–250 golden examples | `scripts/sample_golden.py` creates a 200-row annotation template |
+| Two baselines | Majority class + TF-IDF Logistic Regression |
+| Evaluation harness | `evaluation/run_evaluation.py` |
+| LLM-as-judge | `evaluation/llm_judge.py` (optional OpenAI-compatible API) |
+| Human vs judge agreement | `evaluation/compare_judge_human.py` |
+| Failure analysis | `evaluation/failure_analysis.py` |
+| Decision log | `DECISIONS.md` |
+
+## Dataset
+
+Primary dataset: [Customer Support on Twitter](https://www.kaggle.com/datasets/thoughtvector/customer-support-on-twitter).
+
+The dataset contains anonymized tweet IDs/authors, inbound/outbound direction, timestamps, text, response IDs, and parent-response IDs. Conversation reconstruction is based on `in_response_to_tweet_id` and `response_tweet_id`.
+
+Download `twcs.csv` from Kaggle and put it at:
+
+```text
+data/raw/twcs.csv
+```
+
+Do not commit the full dataset to GitHub.
+
+## Quick start
+
+### 1. Create environment
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+pip install -r requirements.txt
+```
+
+### 2. Inspect brands
+
+```bash
+python scripts/profile_dataset.py --csv data/raw/twcs.csv --top 20
+```
+
+The dataset has anonymized IDs; common brand accounts can be identified from the outbound author IDs. The profiler reports the most active outbound author IDs.
+
+### 3. Select a brand
+
+Edit `config.yaml`:
+
+```yaml
+brand_author_id: "PUT_SELECTED_OUTBOUND_AUTHOR_ID_HERE"
+```
+
+Then:
+
+```bash
+python scripts/prepare_brand.py --csv data/raw/twcs.csv --out data/processed/brand_cases.csv
+```
+
+### 4. Create the golden-set template
+
+```bash
+python scripts/sample_golden.py --input data/processed/brand_cases.csv --output data/golden/golden.csv --n 200
+```
+
+Open `data/golden/golden.csv` and hand-label **intent**, **should_escalate**, and **expected_resolution**. Do not auto-label these fields for the final submission.
+
+### 5. Train the baseline/agent
+
+```bash
+python scripts/train.py --golden data/golden/golden.csv --cases data/processed/brand_cases.csv
+```
+
+This writes models under `artifacts/`.
+
+### 6. Evaluate
+
+```bash
+python evaluation/run_evaluation.py
+```
+
+Outputs go to `reports/`.
+
+### 7. Run the API
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open http://127.0.0.1:8000
+
+## Optional LLM generation
+
+The system is runnable without an API key. Without one, it uses a conservative evidence-based draft assembled from retrieved historical resolutions.
+
+For LLM-generated drafts/judging, create `.env`:
+
+```text
+OPENAI_API_KEY=your_key
+OPENAI_MODEL=gpt-5.6-mini
+```
+
+If your provider uses another OpenAI-compatible endpoint/model, set `OPENAI_BASE_URL` and `OPENAI_MODEL` accordingly.
+
+## Evaluation protocol
+
+Recommended final setup:
+
+- 200 hand-labelled golden examples.
+- Stratified sampling across common/ambiguous/rare cases.
+- Majority-class baseline.
+- TF-IDF + Logistic Regression baseline.
+- SupportIQ classifier + retrieval + generation + escalation.
+- Report intent Macro F1, weighted F1, accuracy, per-class metrics.
+- Report escalation precision/recall/F1 separately.
+- Have a human score 50 generated replies.
+- Have the LLM judge score the same 50.
+- Report exact agreement, within-1 agreement and Spearman correlation.
+
+### What is misleading about the headline number?
+
+Do not interpret intent Macro F1 as an end-to-end automation rate. A correct intent can still produce an unsupported reply, and a fluent reply can still be unsafe to auto-send. The evaluation set is also small and historical. The strongest production metric is the fraction of cases that can be **safely and correctly resolved with adequate evidence**, not classification F1 alone.
+
+## Report
+
+See `REPORT_TEMPLATE.md`. Replace every `TBD` with measurements generated by the evaluation scripts. Never invent results.
+
+## License / citation
+
+The dataset is provided by Thought Vector via Kaggle. Follow the dataset's stated license and the assignment's instruction to cite borrowed material.

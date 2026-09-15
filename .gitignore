@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+artifacts/
+reports/*.csv
+reports/*.json
+reports/*.txt
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep

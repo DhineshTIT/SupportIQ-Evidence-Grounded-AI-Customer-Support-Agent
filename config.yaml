@@ -1,0 +1,7 @@
+brand_author_id: ""
+random_seed: 42
+retrieval_top_k: 5
+min_retrieval_similarity: 0.20
+intent_confidence_threshold: 0.55
+escalation_similarity_threshold: 0.25
+max_train_examples: 5000
